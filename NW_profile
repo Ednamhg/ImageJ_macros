@@ -1,0 +1,397 @@
+//Writen by Carlos M. Quintero and Edna M. Hernández
+//Mail: cmquintero@gmail.com, ednah@ciencias.unam.mx
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+macro "Massive Profiles [m]"{
+//This macro looks for .tif files that finish by_aligned.
+//Then it takes the profile, of each image on each of these files,
+// along a line previously defined by the user in the  ROI manager
+
+	dir = getDirectory("Choose a Directory ");
+	list = getFileList(dir);
+	ROI_NUM=1;
+	Start_IM=1;
+	
+	//setBatchMode(true);
+     	for (i=0; i<list.length; i++) {
+		showProgress(i, list.length); ///////////////////////
+
+        		if (endsWith(list[i], "_aligned.tif")){
+			open(""+dir+list[i]);
+			Finish_IM=nSlices;
+			run("Clear Results");
+			RecordProfile();
+			close();
+			}
+     		}
+	setBatchMode(false);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+macro "Stack Treatment [q]"{
+
+//Shortcut key: q
+//This macro treats the raw stack of images. It receives the length (r, in pixels) of the
+//median filter that will be employed on the stack, the image numbers for the low (LT) and 
+//high (HT) temperature reference.  
+      Dialog.create("Stack Treatment");
+      Dialog.addNumber("MedianFilter (r):", 3);
+      Dialog.addNumber("Low Temp Reference (LT):",1);
+      nPics=nSlices;
+      Dialog.addNumber("High Temp Reference (HT):",nPics);
+      Dialog.show();
+      rNum=Dialog.getNumber();  
+      ansNorm=Dialog.getChoice();
+      LT=Dialog.getNumber();
+      HT=Dialog.getNumber();
+
+      Original=getTitle();
+      FilterMedian_R3();
+
+//The data type of the stack of images is transformed to 32 bits float in order to perform
+//divisions between images without loosing information of the fractions. The new stack
+//is stored in the global variable IM32bits.
+      Turn32bits();
+      IM32bits=getTitle();
+      selectWindow(Original);
+      close();
+
+//The DeltaF() function calculates HT-LT and leaves it open in a window named Delta.tif
+      selectWindow(IM32bits);
+      DeltaF(); 
+
+//The function StacksubsbyLTimage() substracts LT from each image of the stack under
+//analysis. The name of the window with the resulting stack is stored in the global variable
+//SubLT.
+      selectWindow(IM32bits);	
+      StacksubsbyLTimage();
+      SubLT=getTitle();
+       //saveAs(".tif");
+
+//The function Ratio() divides the Stack SubLT by (HT-LT)
+       Ratio();
+       //RecordProfile();
+       //run("Dynamic Profiler");
+}
+
+////////////////////////////////////////////////////////////////////
+//Functions of the macro "Stack Treatment"
+////////////////////////////////////////////////////////////////////
+//Median Filter to the stack under analysis
+function FilterMedian_R3(){
+     run("Median...", "radius="+rNum+" stack");
+     //run("Gaussian Blur...", "sigma=1 stack");
+}
+
+//Transformation of the stack to 32-bit float data type
+function Turn32bits(){
+	T=getInfo("image.filename");
+	run("Duplicate...", "title=[Copy_1.tif]");
+	imageCalculator("Divide create 32-bit stack", "Copy_1.tif","Copy_1.tif");
+	selectWindow("Copy_1.tif");
+	close();
+	imageCalculator("Divide create 32-bit stack", T,"Result of Copy_1.tif");
+	IM32bits=getTitle();
+	selectWindow("Result of Copy_1.tif");
+	close();
+            selectWindow(IM32bits);
+	}
+
+//Calculation of the reference HT-LT
+function DeltaF(){   
+	setSlice(LT);
+	run("Duplicate...", "title=[LT.tif]");
+            selectWindow(IM32bits);
+	setSlice(HT);
+	run("Duplicate...", "title=[HT.tif]");
+
+            imageCalculator("Subtract create 32-bit stack","HT.tif","LT.tif");
+	TT=getTitle();
+	run("Duplicate...", "title=[Delta.tif]");
+            selectWindow(TT);
+	close();
+
+	selectWindow("HT.tif");
+	close();
+	selectWindow("LT.tif");
+	close();
+}
+
+//Substraction of LT from each image of the stack under study
+function StacksubsbyLTimage(){
+	setSlice(LT);
+	run("Duplicate...", "title=[LT.tif]");
+	imageCalculator("Substract create 32-bit stack",IM32bits,"LT.tif");
+	SubLT=getTitle();
+	setSlice(LT+1);
+	run("Enhance Contrast", "saturated=0.35");
+            selectWindow(SubLT);
+}
+
+//Calculation of SubLT/(HT-LT)
+function Ratio(){
+	imageCalculator("Divide create 32-bit stack",SubLT,"Delta.tif");
+	setSlice(LT+1);
+	run("Enhance Contrast", "saturated=0.35");	
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+macro "NW Profiles [p]"{
+
+//Shortcut key: p
+//This macro receives a ROI predifined by the user in the form of a line and returns a table
+//with the the values of each pixel along the line for each image of the stack. The information
+//contained in the table is also copied in order to be pasted directly on another program
+//(Excel, Matlab, etc).
+//NOTE: Before running this macro it is imperative to define in the ROI manager the line of
+//the ROI.
+
+      Dialog.create("NW Treatment");
+      Dialog.addNumber("Roi number:", 1);
+      Dialog.addNumber("Start Image:", 1);
+      Dialog.addNumber("End Image:", nSlices);
+      Dialog.show();
+      ROI_NUM=Dialog.getNumber();
+      Start_IM=Dialog.getNumber();
+      Finish_IM=Dialog.getNumber();
+
+     run("Clear Results");
+     RecordProfile()
+ }
+
+////////////////////////////////////////////////////////////////////
+//Functions of the macro "NW Profiles"
+////////////////////////////////////////////////////////////////////
+
+function RecordProfile(){
+   count=0;
+   setOption("Show All", true);
+
+   for (n=Start_IM; n<=Finish_IM; n++) {
+	setSlice(n);
+      	ROI_N=ROI_NUM-1;
+	roiManager("select", ROI_N);
+            roiManager("Remove Slice Info");
+
+	roiManager("select", ROI_N);
+            profile = getProfile();
+
+	count++;
+
+       	for (i=0; i<profile.length; i++){
+            	setResult("d"+count, i, profile[i]);
+             	}
+   }
+
+ updateResults();
+ String.resetBuffer;
+ String.copyResults;
+ roiManager("deselect");
+ setOption("Show All", false);
+ roiManager("select",0);
+ setSlice(1);
+ Original=File.nameWithoutExtension;
+ selectWindow("Results");  //to erase
+ String.copy(Original);       //to erase  
+ //saveAs("results");             //to erase
+ saveAs("measurements",""+dir+Original+".txt");           
+
+ }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+macro "ROI_Cycle [c]"{
+
+//Shortcut key: c
+// This macro receives the number of pictures per cycle (NumStep), the initial value in mA
+// applied to the nanowire (InValue), step size employed in the cycle (StepSize), quantity of
+// cycles contained in the stack under analysis (NumCycle) and a ROI number (already 
+// defined in the ROI manager) (NumRoi). Then, it returns a table with the information 
+// organized as a function of applied current and cycle number ready to be pasted on a 
+// different software (Excel, Matlab, etc).
+
+	Dialog.create("ROI Cycle");
+	Dialog.addNumber("Size of Cycle:", 0);
+	Dialog.addNumber("Initial Value (mA):", 0);
+	Dialog.addNumber("Initial Pic of cycle (@0 mA):", 0);
+	Dialog.addNumber("Step Size (mA):", 0.5);
+	Dialog.addNumber("Quantity of Cycles:", 1);
+	Dialog.addNumber("ROI to use:", 4);
+	Dialog.show();
+	NumStep=Dialog.getNumber();
+	InValue=Dialog.getNumber();
+            InPic=Dialog.getNumber();
+	StepSize=Dialog.getNumber();
+	NumCycle=Dialog.getNumber();
+	NumRoi=Dialog.getNumber();
+	ROI_N=NumRoi-1;
+	
+      	run("Clear Results");
+	Calc_Roi();
+}
+
+////////////////////////////////////////////////////////////////////
+//Functions of the macro "ROI_Cycle"
+////////////////////////////////////////////////////////////////////
+function Calc_Roi(){
+	
+	for (n=0; n<=NumStep-1; n++){
+            	setResult("i (mA)", n, n*StepSize);
+        			}
+     for (j=ROI_N; j<roiManager("count"); j++){
+	for (k=1; k<=NumCycle; k++) {
+		for (n=1; n<=NumStep; n++) {
+			setSlice(n+(k-1)*NumStep+InPic-1);	
+			roiManager("select", j);
+			getRawStatistics(area,mean,std);
+			aux=j+1;
+			setResult("ROI"+aux+"_Cycle"+k, n-1, mean);
+			//setResult("Cycle"+k, n-1, std);
+			}
+		}
+	}	
+	updateResults();
+	String.resetBuffer;
+	String.copyResults;
+	roiManager("deselect");
+	setOption("Show All", false);
+	roiManager("select",0);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//ROI managment macros
+//These two macros were writen to facilitate the storage and charge of a particular set of 
+//ROIs
+
+macro "Save ROIs [r]"{
+     for (n=0; n<roiManager("count"); n++){
+      	roiManager("select", n);
+      	roiManager("Remove Slice Info");
+      	}
+     roiManager("Save", "");
+ }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+macro "Open ROI [o]"{
+     if(roiManager("count")!=0){
+             roiManager("deselect");
+             roiManager("Delete");
+             }
+     roiManager("Open", "");
+     roiManager("Show all with labels");
+ }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+macro "Stack Treatment [e]"{
+//For RhodamineB
+//Shortcut key: e
+      Dialog.create("Stack Treatment");
+      Dialog.addNumber("MedianFilter (r):", 3);
+      Dialog.addNumber("Low Temp Reference (LT):",1);
+      nPics=nSlices;
+      //Dialog.addNumber("High Temp Reference (HT):",nPics);
+      Dialog.show();
+      rNum=Dialog.getNumber();  
+      ansNorm=Dialog.getChoice();
+      LT=Dialog.getNumber();
+      //HT=Dialog.getNumber(); //Ac  guardo LT!
+
+      Original=getTitle();
+      FilterMedian_R3();
+
+//The data type of the stack of images is transformed to 32 bits float in order to perform
+//divisions between images without loosing information of the fractions. The new stack
+//is stored in the global variable IM32bits.
+      Turn32bits();
+      IM32bits=getTitle();
+      selectWindow(Original);
+      close();
+
+      selectWindow(IM32bits);
+      Step1(); 
+      LT_Pic=getTitle();
+
+      selectWindow(IM32bits);
+      Step2();	
+      aux=getTitle();
+      run("Duplicate...", "title=[LT_stack.tif] duplicate range=1-nPics");
+      LT_stack=getTitle();
+      selectWindow(aux);
+      close();
+
+  //    Step3();
+  //    Resta=getTitle();
+
+      Step4();
+}
+
+function Step1(){   
+	setSlice(LT);
+	run("Duplicate...", "title=[LT.tif]");
+}
+
+function Step2(){
+	selectWindow(IM32bits);
+	run("Duplicate...", "title=[Copy_1.tif] duplicate range=1-nPics");
+	imageCalculator("Divide create 32-bit stack", "Copy_1.tif","Copy_1.tif");
+	selectWindow("Copy_1.tif");
+	close();
+	imageCalculator("Multiply create 32-bit stack","Result of Copy_1.tif","LT.tif");
+	LT_stack=getTitle();
+	selectWindow("Result of Copy_1.tif");
+	close();
+            selectWindow(LT_stack);
+}
+
+function Step3(){
+	selectWindow("LT_stack.tif");
+	imageCalculator("Substract create 32-bit stack","HT_stack.tif",IM32bits);
+	selectWindow("Result of HT_stack.tif");
+	//imageCalculator("Substract create 32-bit stack",IM32bits,"HT_stack.tif");
+            //selectWindow("Result of "+IM32bits);
+	Resta=getTitle();
+}
+
+function Step4(){
+	imageCalculator("Divide create 32-bit stack",IM32bits,"LT_stack.tif");
+	//setSlice(LT);
+	run("Enhance Contrast", "saturated=0.35");	
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro "AFM_Process [z]"{
+	AFM();
+}
+
+function AFM(){
+
+	Dialog.create("AFM");
+	Dialog.addNumber("ROI to fix baseline:", 1);
+	Dialog.show();
+	NumRoi=Dialog.getNumber();
+	ROI_N=NumRoi-1;
+
+   setOption("Show All", true);
+   run("Clear Results");
+   run("Select All");
+
+   run("32-bit");
+
+   for (n=1; n<=nSlices; n++) {
+       setSlice(n);
+
+             roiManager("select", ROI_N);
+             roiManager("Remove Slice Info");
+
+             roiManager("select", ROI_N);
+             getRawStatistics(area,mean);
+             roiManager("deselect");
+             run("Select All");	
+             run("Subtract...", "value="+mean+" slice");
+   }
+
+run("Enhance Contrast", "saturated=0.35");
+
+ }
