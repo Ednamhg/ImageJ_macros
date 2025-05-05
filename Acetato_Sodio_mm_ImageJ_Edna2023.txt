@@ -1,0 +1,229 @@
+
+
+macro "CountWhite [g]"{
+//Shortcut key: g
+// This macro receives the roi of a line or several lines, the number 
+// of pictures, the time between pictures and from that it obtains the 
+// distance of white vs black on a line (ROI), 
+// as function of time
+	Dialog.create("Count White pixels");
+	Dialog.addNumber("Time between pictures (s):", 0.05);
+        Dialog.addNumber("White_threashold:", 150)
+	Dialog.addNumber("Black_threashold", 80);
+	Dialog.addNumber("Initial:pic:", 1);
+	Dialog.addNumber("Perimeter of white circle in pixels",2554)
+	Dialog.addNumber("Diameter of glass in mm", 30.02)
+	Dialog.show();
+	Time=Dialog.getNumber();
+        WhiteT=Dialog.getNumber();
+        BlackT=Dialog.getNumber();
+        InPic=Dialog.getNumber();
+        Perimeter=Dialog.getNumber();
+        Diam=Dialog.getNumber();
+	run("Clear Results");
+        Calc_Linet();
+
+
+}
+
+
+////////////////////////////////////////////////////////////////////
+//Functions of the macro "ROI_Cycle"
+////////////////////////////////////////////////////////////////////
+
+
+function Calc_Linet(){
+	Diampixels=Perimeter/PI;
+	SizeFile=nSlices;
+	for (n=InPic; n<=SizeFile; n++){
+		setResult("Time (s)", n-InPic, Time*n);
+	}
+	for (j=0; j<roiManager("count"); j++){
+		for (n=InPic; n<=SizeFile; n++){
+			roiManager("select",j)
+			setSlice(n);
+			profile = getProfile();
+			if(profile[0]>WhiteT){
+				i=1;
+				for(k=0; k<profile.length; k++){
+						if(profile[k]>BlackT)
+							i=i+1;	
+				}
+			}
+			else 
+				if(profile[0]<BlackT){
+					i=1;
+					for(k=0; k<profile.length; k++){
+						if(profile[k]<WhiteT)
+							i=i+1;	
+					}
+				}
+				else{
+					Dialog.create("first value in the middle");
+				     }
+			aux=j+1;
+			taille=i*(Diam/Diampixels);
+			setResult("Border Roi"+aux+"(mm)", n-InPic, taille);
+  			}
+		
+		}
+	}
+	updateResults();
+	String.resetBuffer;
+	String.copyResults;
+	roiManager("deselect");
+	setOption("Show All", false);
+	roiManager("select",0);
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//Theese macro generates de difference of one image and the one before
+macro "Difference images [c]"{
+	IdImagen=getImageID(); 
+	SizeFile=nSlices;
+	SizeFile2=nSlices-1;
+	run("Duplicate...", "duplicate range=1-SizeFile2");
+	rename("001");
+	selectImage(IdImagen);
+	run("Duplicate...", "duplicate range=2-SizeFile");
+	rename("002");
+	imageCalculator("Subtract create 32-bit stack", "001","002");
+	
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//This macro creates a set of ROIs made of linesfrom the center of the first oval created by the user to the end of the second oval created by the user.
+macro "Set Lines from a center [d]"{
+	waitForUser("Select the smallest activated circle press ok when done");
+	cx=getValue("X");
+	cy=getValue("Y");
+//	print(cx);
+//	print(cy);
+	waitForUser("Select the biggest activated circle press ok when done");
+	bx=getValue("X");
+	by=getValue("Y");
+	bradius=getValue("Major")/2;
+	roiManager("reset");
+	makeLine(cx,cy,bradius+bx,by);
+	roiManager("add");
+	makeLine(cx,cy,bx-bradius,by);
+	roiManager("add");
+	makeLine(cx,cy,bx, bradius+by);
+	roiManager("add");
+	makeLine(cx,cy,bx, by-bradius);
+	roiManager("add");
+	sinpie2=Math.sin(PI/4);
+	cospie2=Math.cos(PI/4);
+	makeLine(cx,cy,sinpie2*bradius+bx, cospie2*bradius+by);
+	roiManager("add");
+	makeLine(cx,cy,bx-sinpie2*bradius, cospie2*bradius+by);
+	roiManager("add");
+	makeLine(cx,cy,sinpie2*bradius+bx, by-cospie2*bradius);
+	roiManager("add");
+	makeLine(cx,cy,bx-sinpie2*bradius, by-cospie2*bradius);
+	roiManager("add");
+	sinpie4=Math.sin(PI/8);
+	cospie4=Math.cos(PI/8);
+	makeLine(cx,cy,sinpie4*bradius+bx, cospie4*bradius+by);
+	roiManager("add");
+	makeLine(cx,cy,bx-sinpie4*bradius, cospie4*bradius+by);
+	roiManager("add");
+	makeLine(cx,cy,sinpie4*bradius+bx, by-cospie4*bradius);
+	roiManager("add");
+	makeLine(cx,cy,bx-sinpie4*bradius, by-cospie4*bradius);
+	roiManager("add");
+	sin3pie4=Math.sin(3*PI/8);
+	cos3pie4=Math.cos(3*PI/8);
+	makeLine(cx,cy,sin3pie4*bradius+bx, cos3pie4*bradius+by);
+	roiManager("add");
+	makeLine(cx,cy,bx-sin3pie4*bradius, cos3pie4*bradius+by);
+	roiManager("add");
+	makeLine(cx,cy,sin3pie4*bradius+bx, by-cos3pie4*bradius);
+	roiManager("add");
+	makeLine(cx,cy,bx-sin3pie4*bradius, by-cos3pie4*bradius);
+	roiManager("add");
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+macro "Follow dark [f]"{
+//Shortcut key: f
+// This macro receives the roi of a line or several lines, the time 
+// between pictures and from that it obtains the 
+// distance of the minimum in the selected ROI line, 
+// as function of time
+	Dialog.create("Follow dark");
+	Dialog.addNumber("Time between pictures (s):", 0.05);
+        Dialog.addNumber("Threashold:", -10)
+	Dialog.addNumber("Perimeter of white circle in pixels.Last image",2554)
+	Dialog.addNumber("Diameter of glass in mm", 30.02)
+	Dialog.show();
+	Time=Dialog.getNumber();
+        WhiteT=Dialog.getNumber();
+        Perimeter=Dialog.getNumber();
+        Diam=Dialog.getNumber();
+	run("Clear Results");
+        Calc_Dark();
+}
+
+////////////////////////////////////////////////////////////////////
+//Functions of the macro "ROI_Cycle"
+////////////////////////////////////////////////////////////////////
+
+
+function Calc_Dark(){
+	Diampixels=Perimeter/PI;
+	SizeFile=nSlices;
+	for (n=1; n<=SizeFile; n++){
+		setResult("Time (s)", n-1, Time*n);
+	}
+	for (j=0; j<roiManager("count"); j++){
+		roiManager("select",j);
+		for (n=1; n<=SizeFile; n++){
+			setSlice(n);
+			profile = getProfile();
+			min=getMinIndex(profile);
+			if(min[0]<WhiteT){
+				i=min[1];
+			}
+			taille=i*(Diam/Diampixels);
+//			taille=i;
+			aux=j+1;
+			setResult("Border Roi"+aux+"(mm)", n-1, taille);
+		}
+		
+	}
+}
+
+function getMinIndex(array){
+
+    if (array.length == 0){
+        return -1;
+    }
+    min = newArray(0,0);
+    index = 0;
+    for (i = 1; i < array.length; i++){
+        if (array[i] <= min[0]){
+        min[0] = array[i];
+        min[1] = i;
+        }
+    }
+    return min;
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//ROI managment macros
+//These two macros were writen to facilitate the storage and charge of a particular set of 
+//ROIs
+
+macro "Save ROIs [r]"{
+     for (n=0; n<roiManager("count"); n++){
+      	roiManager("select", n);
+      	roiManager("Remove Slice Info");
+      	}
+     roiManager("Save", "");
+ }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+macro "Open ROI [o]"{
+     if(roiManager("count")!=0){
+             roiManager("deselect");
+             roiManager("Delete");
+             }
+     roiManager("Open", "");
+     roiManager("Show all with labels");
+ }
+}

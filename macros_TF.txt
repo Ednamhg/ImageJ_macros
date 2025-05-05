@@ -1,0 +1,82 @@
+
+
+
+macro "ROI_Cycle_T [t]"{
+
+//Shortcut key: t
+// This macro receives the number of pictures per cycle (SizeCycle), the initial value in C
+// applied to the nanowire (InValue), step size employed in the cycle (StepSize), quantity of
+// cycles contained in the stack under analysis (NumCycle) and a ROI number (already 
+// defined in the ROI manager) (NumRoi). Then, it returns a table with the information 
+// organized as a function of applied current and cycle number ready to be pasted on a 
+// different software (Excel, Matlab, etc).
+
+	Dialog.create("ROI Cycle");
+	Dialog.addNumber("Size of File:", 265);
+	Dialog.addNumber("Initial Value (C):", 20);
+        Dialog.addNumber("Final Value (C):", 80);
+        Dialog.addNumber("Pic in Final Value (C):", 4)
+	Dialog.addNumber("Initial Pic of cycle (@0 C):", 1);
+	Dialog.addNumber("Step Size (C):", 0.5);
+	//Dialog.addNumber("ROI to use:", 1);
+	Dialog.show();
+	SizeFile=Dialog.getNumber();
+	InValue=Dialog.getNumber();
+        FiValue=Dialog.getNumber();
+        Wait=Dialog.getNumber();
+        InPic=Dialog.getNumber();
+	StepSize=Dialog.getNumber();
+	//NumRoi=Dialog.getNumber();
+	//ROI_N=NumRoi-1;
+	
+      	run("Clear Results");
+	Calc_RoiT();
+}
+////////////////////////////////////////////////////////////////////
+//Functions of the macro "ROI_Cycle"
+////////////////////////////////////////////////////////////////////
+function Calc_RoiT(){
+	ROI_N=0;	
+	PicFiVal=(FiValue-InValue)/StepSize;
+	SizeCycle=2*(PicFiVal+Wait);
+        NumCycle=floor(SizeFile/SizeCycle);
+	for(sc=0; sc<=NumCycle; sc++){	
+		for (n=0; n<=SizeCycle-1; n++){
+			if (n<=PicFiVal){
+            			setResult("T (C)", n, n*StepSize+InValue);
+				setResult("T(K)", n, n*StepSize+InValue+273.15);
+			}
+			else if (n<PicFiVal+Wait){
+				setResult("T (C)", n, FiValue);
+				setResult("T(K)", n, FiValue+273.15);
+			}
+			else {
+				setResult("T (C)", n, FiValue-(n-PicFiVal-Wait)*StepSize);
+				setResult("T(K)", n, FiValue-(n-PicFiVal-Wait)*StepSize+273.15);
+			}
+        	}
+	}
+
+     for (j=ROI_N; j<roiManager("count"); j++){
+	roiManager("select", j);
+        aux=j+1;
+	for (k=1; k<=NumCycle+1; k++) {
+		for (n=1; n<=SizeCycle; n++) {
+			if(n+(k-1)*SizeCycle+InPic-1<=SizeFile){
+				setSlice(n+(k-1)*SizeCycle+InPic-1);
+ 				//getSliceNumber();				
+				getRawStatistics(area,mean,std);
+				setResult("ROI"+aux+"_Cycle"+k, n-1, mean);
+				//setResult("Cycle"+k, n-1, std);
+				}
+			}
+		}
+	}	
+	updateResults();
+	String.resetBuffer;
+	//String.copy(String.getResultsHeadings);	
+	String.copyResults;
+	roiManager("deselect");
+	setOption("Show All", false);
+	roiManager("select",0);
+}

@@ -1,0 +1,96 @@
+//created by Edna M. Hernandez
+//This macro takes several ROI's of an image and measure its area.
+macro "ROI_Cycle [b]"{
+
+//Shortcut key: b
+// This macro takes several ROI's of an image and measure its area.
+// Then, it returns a table with the information 
+// organized ready to be pasted on a 
+// different software (Excel, Matlab, etc). 
+	
+      	run("Clear Results");
+	Calc_Area();
+}
+
+////////////////////////////////////////////////////////////////////
+//Functions of the macro "ROI_Cycle"
+////////////////////////////////////////////////////////////////////
+function Calc_Area(){
+        			
+     for (j=0; j<roiManager("count"); j++){
+			roiManager("select", j);
+			getStatistics(area,mean,std);
+			aux=j+1;
+			setResult("Area", j, area);
+			}
+	updateResults();		
+	String.resetBuffer;
+	String.copyResults;
+	roiManager("deselect");
+	setOption("Show All", false);
+	roiManager("select",0);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro "N_max_2max [c]"{
+
+//Shortcut key: c
+//This macro takes several ROIs, of an image and mesure its area
+// It returns the number of ROIs, the maximum area and the second maximum area
+// organized ready to be pasted on a 
+// different software (Excel, Matlab, etc).
+     run("Clear Results");
+     Calc_N_max_2max();
+     }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//Functions of the macro N_max_2max
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+function Calc_N_max_2max(){
+     secmaxarea=0;
+     maxarea=0;
+     N=roiManager("count");			
+     for (j=0; j<N; j++){
+			roiManager("select", j);
+			getStatistics(area,mean,std);
+			if(area>maxarea){
+			           secmaxarea=maxarea;
+			}else if(area>secmaxarea){
+			           secmaxarea=area;
+			}
+			maxarea=Math.max(maxarea,area);
+			}
+			setResult("Number_Bubbles", 0, N);
+			setResult("Max_Area", 0, maxarea);
+			setResult("Sec_max_Area", 0, secmaxarea);
+	updateResults();		
+	String.resetBuffer;
+	String.copyResults;
+	roiManager("deselect");
+	setOption("Show All", false);
+	roiManager("select",0);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//ROI managment macros
+//These two macros were writen to facilitate the storage and charge of a particular set of 
+//ROIs
+
+macro "Save ROIs [r]"{
+     for (n=0; n<roiManager("count"); n++){
+      	roiManager("select", n);
+      	roiManager("Remove Slice Info");
+      	}
+     roiManager("Save", "");
+ }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+macro "Open ROI [o]"{
+     if(roiManager("count")!=0){
+             roiManager("deselect");
+             roiManager("Delete");
+             }
+     roiManager("Open", "");
+     roiManager("Show all with labels");
+ }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
