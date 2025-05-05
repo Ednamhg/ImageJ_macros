@@ -1,5 +1,5 @@
 # ImageJ_macros 
-Macros for Fiji(Image J) and Octave to do things in "Laser Optic's Laboratory" at UNAM
+Macros for Fiji(Image J, **they are *.txt***) and Octave (**they are *.m***) to do things in "Laser Optic's Laboratory" at UNAM
 
 ## Acetato de Sodio Instrucciones
 ### Convertir el video en imágenes
